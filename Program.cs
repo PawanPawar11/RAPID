@@ -1,8 +1,11 @@
-﻿using System.Net;
+﻿using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
 TcpListener listener = new TcpListener(IPAddress.Any, 6379);
+
+ConcurrentDictionary<string, string> store = new ConcurrentDictionary<string, string>();
 
 listener.Start();
 
@@ -28,6 +31,8 @@ while (true)
 
         Console.WriteLine($"Received: {message}");
 
+        store["lastMessage"] = message;
+
         string response = "OK";
 
         byte[] responseBytes = Encoding.UTF8.GetBytes(response);
@@ -37,6 +42,7 @@ while (true)
         stream.Close();
         client.Close();
 
+        Console.WriteLine(store["lastMessage"]);
         Console.WriteLine("Client disconnected.");
     });
 }
