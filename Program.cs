@@ -18,15 +18,28 @@ while (true)
 
     Console.WriteLine("New client connected.");
 
-    Task task = Task.Run(() =>
-    {
-        using NetworkStream stream = client.GetStream();
+    _ = Task.Run(() => HandleClient(client, store));
+}
 
+static void HandleClient(TcpClient client, ConcurrentDictionary<string, string> store)
+{
+    using (client)
+    using (NetworkStream stream = client.GetStream())
+    {
         byte[] buffer = new byte[1024];
 
         while (true)
         {
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
+            int bytesRead;
+
+            try
+            {
+                bytesRead = stream.Read(buffer, 0, buffer.Length);
+            }
+            catch
+            {
+                break;
+            }
 
             // Client disconnected
             if (bytesRead == 0)
@@ -34,7 +47,9 @@ while (true)
                 break;
             }
 
-            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
+            string message = Encoding.UTF8
+                .GetString(buffer, 0, bytesRead)
+                .Trim();
 
             Console.WriteLine($"Received: {message}");
 
@@ -48,7 +63,7 @@ while (true)
                 continue;
             }
 
-            string command = parts[0].ToUpper();
+            string command = parts[0].ToUpperInvariant();
 
             switch (command)
             {
@@ -56,18 +71,18 @@ while (true)
                     {
                         if (parts.Length < 3)
                         {
-                            WriteResponse(stream, "ERROR: Usage: SET <key> <value>");
+                            WriteError(stream, "Usage: SET <key> <value>");
                             break;
                         }
 
                         string key = parts[1];
 
-                        // Allows values containing spaces
+                        // Supports values containing spaces
                         string value = string.Join(" ", parts.Skip(2));
 
                         store[key] = value;
 
-                        WriteResponse(stream, "OK");
+                        WriteOk(stream);
                         break;
                     }
 
@@ -75,7 +90,7 @@ while (true)
                     {
                         if (parts.Length < 2)
                         {
-                            WriteResponse(stream, "ERROR: Usage: GET <key>");
+                            WriteError(stream, "Usage: GET <key>");
                             break;
                         }
 
@@ -83,11 +98,11 @@ while (true)
 
                         if (store.TryGetValue(key, out string? value))
                         {
-                            WriteResponse(stream, value);
+                            WriteBulkString(stream, value);
                         }
                         else
                         {
-                            WriteResponse(stream, "(nil)");
+                            WriteNullBulkString(stream);
                         }
 
                         break;
@@ -95,20 +110,39 @@ while (true)
 
                 default:
                     {
-                        WriteResponse(stream, "ERROR: Unknown command");
+                        WriteError(stream, $"Unknown command '{command}'");
                         break;
                     }
             }
         }
+    }
 
-        client.Close();
-
-        Console.WriteLine("Client disconnected.");
-    });
+    Console.WriteLine("Client disconnected.");
 }
 
-static void WriteResponse(NetworkStream stream, string response)
+static void WriteOk(NetworkStream stream)
 {
-    byte[] responseBytes = Encoding.UTF8.GetBytes(response + "\r\n");
-    stream.Write(responseBytes, 0, responseBytes.Length);
+    byte[] response = Encoding.UTF8.GetBytes("+OK\r\n");
+    stream.Write(response, 0, response.Length);
+}
+
+static void WriteBulkString(NetworkStream stream, string value)
+{
+    string response = $"${value.Length}\r\n{value}\r\n";
+
+    byte[] bytes = Encoding.UTF8.GetBytes(response);
+
+    stream.Write(bytes, 0, bytes.Length);
+}
+
+static void WriteNullBulkString(NetworkStream stream)
+{
+    byte[] response = Encoding.UTF8.GetBytes("$-1\r\n");
+    stream.Write(response, 0, response.Length);
+}
+
+static void WriteError(NetworkStream stream, string message)
+{
+    byte[] response = Encoding.UTF8.GetBytes($"-ERR {message}\r\n");
+    stream.Write(response, 0, response.Length);
 }
