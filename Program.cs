@@ -7,28 +7,22 @@ using System.Threading.Tasks;
 
 class Program
 {
-    // Thread-safe in-memory key-value store
     private static readonly ConcurrentDictionary<string, string> _store =
         new ConcurrentDictionary<string, string>();
 
     static async Task Main(string[] args)
     {
-        // Listen on port 6379
         int port = 6379;
         TcpListener listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
 
-        // Logging
         Log($"Redis Server started and listening on port {port}...");
 
         try
         {
             while (true)
             {
-                // Accept incoming client
                 TcpClient client = await listener.AcceptTcpClientAsync();
-
-                // Support multiple clients using Task.Run
                 _ = Task.Run(() => HandleClient(client));
             }
         }
@@ -41,8 +35,6 @@ class Program
     private static void HandleClient(TcpClient client)
     {
         string clientEndPoint = client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
-
-        // Logging connection
         Log($"Client connected: {clientEndPoint}");
 
         using NetworkStream stream = client.GetStream();
@@ -52,10 +44,8 @@ class Program
         {
             while (true)
             {
-                // Read text from socket
                 int bytesRead = stream.Read(buffer, 0, buffer.Length);
 
-                // Handle client disconnects (bytesRead == 0 means client closed connection)
                 if (bytesRead == 0)
                 {
                     Log($"Client disconnected gracefully: {clientEndPoint}");
@@ -64,13 +54,11 @@ class Program
 
                 string input = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
 
-                // Print received command
                 Log($"[{clientEndPoint}] Received command: {input}");
 
                 if (string.IsNullOrWhiteSpace(input))
                     continue;
 
-                // Simple parser split by spaces
                 string[] parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 string command = parts[0].ToUpper();
 
@@ -78,39 +66,30 @@ class Program
 
                 switch (command)
                 {
-                    // Parse SET key value
                     case "SET":
                         if (parts.Length >= 3)
                         {
                             string key = parts[1];
                             string value = string.Join(" ", parts, 2, parts.Length - 2);
-
                             _store[key] = value;
-
-                            // Return OK
                             response = "+OK\r\n";
                         }
                         else
                         {
                             response = "-ERR wrong number of arguments for 'set' command\r\n";
                         }
-
                         break;
 
-                    // Parse GET key
                     case "GET":
                         if (parts.Length >= 2)
                         {
                             string key = parts[1];
-
                             if (_store.TryGetValue(key, out string? val))
                             {
-                                // Return response (RESP bulk string format)
                                 response = $"${Encoding.UTF8.GetByteCount(val)}\r\n{val}\r\n";
                             }
                             else
                             {
-                                // Key not found (null bulk string)
                                 response = "$-1\r\n";
                             }
                         }
@@ -118,7 +97,48 @@ class Program
                         {
                             response = "-ERR wrong number of arguments for 'get' command\r\n";
                         }
+                        break;
 
+                    case "DEL":
+                        if (parts.Length >= 2)
+                        {
+                            int deletedCount = 0;
+
+                            for (int i = 1; i < parts.Length; i++)
+                            {
+                                if (_store.TryRemove(parts[i], out _))
+                                {
+                                    deletedCount++;
+                                }
+                            }
+
+                            response = $":{deletedCount}\r\n";
+                        }
+                        else
+                        {
+                            response = "-ERR wrong number of arguments for 'del' command\r\n";
+                        }
+                        break;
+
+                    case "EXISTS":
+                        if (parts.Length >= 2)
+                        {
+                            int existingCount = 0;
+
+                            for (int i = 1; i < parts.Length; i++)
+                            {
+                                if (_store.ContainsKey(parts[i]))
+                                {
+                                    existingCount++;
+                                }
+                            }
+
+                            response = $":{existingCount}\r\n";
+                        }
+                        else
+                        {
+                            response = "-ERR wrong number of arguments for 'exists' command\r\n";
+                        }
                         break;
 
                     case "PING":
@@ -130,14 +150,12 @@ class Program
                         break;
                 }
 
-                // Send response back
                 byte[] responseBytes = Encoding.UTF8.GetBytes(response);
                 stream.Write(responseBytes, 0, responseBytes.Length);
             }
         }
         catch (Exception ex)
         {
-            // Handle unexpected client disconnects or socket errors
             Log($"Client error/disconnect [{clientEndPoint}]: {ex.Message}");
         }
         finally
