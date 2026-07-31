@@ -5,7 +5,8 @@ using System.Text;
 
 TcpListener listener = new TcpListener(IPAddress.Any, 6379);
 
-ConcurrentDictionary<string, string> store = new ConcurrentDictionary<string, string>();
+// Shared in-memory key-value store
+ConcurrentDictionary<string, string> store = new();
 
 listener.Start();
 
@@ -13,36 +14,101 @@ Console.WriteLine("Redis server started on port 6379...");
 
 while (true)
 {
-    // Wait for a new client
     TcpClient client = listener.AcceptTcpClient();
 
     Console.WriteLine("New client connected.");
 
-    // Handle the client on a separate thread
     Task task = Task.Run(() =>
     {
-        NetworkStream stream = client.GetStream();
+        using NetworkStream stream = client.GetStream();
 
         byte[] buffer = new byte[1024];
 
-        int bytesRead = stream.Read(buffer, 0, buffer.Length);
+        while (true)
+        {
+            int bytesRead = stream.Read(buffer, 0, buffer.Length);
 
-        string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            // Client disconnected
+            if (bytesRead == 0)
+            {
+                break;
+            }
 
-        Console.WriteLine($"Received: {message}");
+            string message = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
 
-        store["lastMessage"] = message;
+            Console.WriteLine($"Received: {message}");
 
-        string response = "OK";
+            string[] parts = message.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries
+            );
 
-        byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+            if (parts.Length == 0)
+            {
+                continue;
+            }
 
-        stream.Write(responseBytes, 0, responseBytes.Length);
+            string command = parts[0].ToUpper();
 
-        stream.Close();
+            switch (command)
+            {
+                case "SET":
+                    {
+                        if (parts.Length < 3)
+                        {
+                            WriteResponse(stream, "ERROR: Usage: SET <key> <value>");
+                            break;
+                        }
+
+                        string key = parts[1];
+
+                        // Allows values containing spaces
+                        string value = string.Join(" ", parts.Skip(2));
+
+                        store[key] = value;
+
+                        WriteResponse(stream, "OK");
+                        break;
+                    }
+
+                case "GET":
+                    {
+                        if (parts.Length < 2)
+                        {
+                            WriteResponse(stream, "ERROR: Usage: GET <key>");
+                            break;
+                        }
+
+                        string key = parts[1];
+
+                        if (store.TryGetValue(key, out string? value))
+                        {
+                            WriteResponse(stream, value);
+                        }
+                        else
+                        {
+                            WriteResponse(stream, "(nil)");
+                        }
+
+                        break;
+                    }
+
+                default:
+                    {
+                        WriteResponse(stream, "ERROR: Unknown command");
+                        break;
+                    }
+            }
+        }
+
         client.Close();
 
-        Console.WriteLine(store["lastMessage"]);
         Console.WriteLine("Client disconnected.");
     });
+}
+
+static void WriteResponse(NetworkStream stream, string response)
+{
+    byte[] responseBytes = Encoding.UTF8.GetBytes(response + "\r\n");
+    stream.Write(responseBytes, 0, responseBytes.Length);
 }
