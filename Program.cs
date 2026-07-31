@@ -6,24 +6,37 @@ TcpListener listener = new TcpListener(IPAddress.Any, 6379);
 
 listener.Start();
 
-TcpClient client = listener.AcceptTcpClient();
+Console.WriteLine("Redis server started on port 6379...");
 
-NetworkStream stream = client.GetStream();
+while (true)
+{
+    // Wait for a new client
+    TcpClient client = listener.AcceptTcpClient();
 
-byte[] buffer = new byte[1024];
+    Console.WriteLine("New client connected.");
 
-int bytesRead = stream.Read(buffer, 0, buffer.Length);
+    // Handle the client on a separate thread
+    Task task = Task.Run(() =>
+    {
+        NetworkStream stream = client.GetStream();
 
-string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+        byte[] buffer = new byte[1024];
 
-Console.WriteLine(message);
+        int bytesRead = stream.Read(buffer, 0, buffer.Length);
 
-string response = "OK";
+        string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
 
-byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+        Console.WriteLine($"Received: {message}");
 
-stream.Write(responseBytes);
+        string response = "OK";
 
-stream.Close();
-client.Close();
-listener.Stop();
+        byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+
+        stream.Write(responseBytes, 0, responseBytes.Length);
+
+        stream.Close();
+        client.Close();
+
+        Console.WriteLine("Client disconnected.");
+    });
+}
