@@ -1,148 +1,153 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
 
-TcpListener listener = new TcpListener(IPAddress.Any, 6379);
-
-// Shared in-memory key-value store
-ConcurrentDictionary<string, string> store = new();
-
-listener.Start();
-
-Console.WriteLine("Redis server started on port 6379...");
-
-while (true)
+class Program
 {
-    TcpClient client = listener.AcceptTcpClient();
+    // Thread-safe in-memory key-value store
+    private static readonly ConcurrentDictionary<string, string> _store =
+        new ConcurrentDictionary<string, string>();
 
-    Console.WriteLine("New client connected.");
-
-    _ = Task.Run(() => HandleClient(client, store));
-}
-
-static void HandleClient(TcpClient client, ConcurrentDictionary<string, string> store)
-{
-    using (client)
-    using (NetworkStream stream = client.GetStream())
+    static async Task Main(string[] args)
     {
-        byte[] buffer = new byte[1024];
+        // Listen on port 6379
+        int port = 6379;
+        TcpListener listener = new TcpListener(IPAddress.Any, port);
+        listener.Start();
 
-        while (true)
+        // Logging
+        Log($"Redis Server started and listening on port {port}...");
+
+        try
         {
-            int bytesRead;
-
-            try
+            while (true)
             {
-                bytesRead = stream.Read(buffer, 0, buffer.Length);
+                // Accept incoming client
+                TcpClient client = await listener.AcceptTcpClientAsync();
+
+                // Support multiple clients using Task.Run
+                _ = Task.Run(() => HandleClient(client));
             }
-            catch
-            {
-                break;
-            }
-
-            // Client disconnected
-            if (bytesRead == 0)
-            {
-                break;
-            }
-
-            string message = Encoding.UTF8
-                .GetString(buffer, 0, bytesRead)
-                .Trim();
-
-            Console.WriteLine($"Received: {message}");
-
-            string[] parts = message.Split(
-                ' ',
-                StringSplitOptions.RemoveEmptyEntries
-            );
-
-            if (parts.Length == 0)
-            {
-                continue;
-            }
-
-            string command = parts[0].ToUpperInvariant();
-
-            switch (command)
-            {
-                case "SET":
-                    {
-                        if (parts.Length < 3)
-                        {
-                            WriteError(stream, "Usage: SET <key> <value>");
-                            break;
-                        }
-
-                        string key = parts[1];
-
-                        // Supports values containing spaces
-                        string value = string.Join(" ", parts.Skip(2));
-
-                        store[key] = value;
-
-                        WriteOk(stream);
-                        break;
-                    }
-
-                case "GET":
-                    {
-                        if (parts.Length < 2)
-                        {
-                            WriteError(stream, "Usage: GET <key>");
-                            break;
-                        }
-
-                        string key = parts[1];
-
-                        if (store.TryGetValue(key, out string? value))
-                        {
-                            WriteBulkString(stream, value);
-                        }
-                        else
-                        {
-                            WriteNullBulkString(stream);
-                        }
-
-                        break;
-                    }
-
-                default:
-                    {
-                        WriteError(stream, $"Unknown command '{command}'");
-                        break;
-                    }
-            }
+        }
+        finally
+        {
+            listener.Stop();
         }
     }
 
-    Console.WriteLine("Client disconnected.");
-}
+    private static void HandleClient(TcpClient client)
+    {
+        string clientEndPoint = client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
 
-static void WriteOk(NetworkStream stream)
-{
-    byte[] response = Encoding.UTF8.GetBytes("+OK\r\n");
-    stream.Write(response, 0, response.Length);
-}
+        // Logging connection
+        Log($"Client connected: {clientEndPoint}");
 
-static void WriteBulkString(NetworkStream stream, string value)
-{
-    string response = $"${value.Length}\r\n{value}\r\n";
+        using NetworkStream stream = client.GetStream();
+        byte[] buffer = new byte[1024];
 
-    byte[] bytes = Encoding.UTF8.GetBytes(response);
+        try
+        {
+            while (true)
+            {
+                // Read text from socket
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
 
-    stream.Write(bytes, 0, bytes.Length);
-}
+                // Handle client disconnects (bytesRead == 0 means client closed connection)
+                if (bytesRead == 0)
+                {
+                    Log($"Client disconnected gracefully: {clientEndPoint}");
+                    break;
+                }
 
-static void WriteNullBulkString(NetworkStream stream)
-{
-    byte[] response = Encoding.UTF8.GetBytes("$-1\r\n");
-    stream.Write(response, 0, response.Length);
-}
+                string input = Encoding.UTF8.GetString(buffer, 0, bytesRead).Trim();
 
-static void WriteError(NetworkStream stream, string message)
-{
-    byte[] response = Encoding.UTF8.GetBytes($"-ERR {message}\r\n");
-    stream.Write(response, 0, response.Length);
+                // Print received command
+                Log($"[{clientEndPoint}] Received command: {input}");
+
+                if (string.IsNullOrWhiteSpace(input))
+                    continue;
+
+                // Simple parser split by spaces
+                string[] parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                string command = parts[0].ToUpper();
+
+                string response;
+
+                switch (command)
+                {
+                    // Parse SET key value
+                    case "SET":
+                        if (parts.Length >= 3)
+                        {
+                            string key = parts[1];
+                            string value = string.Join(" ", parts, 2, parts.Length - 2);
+
+                            _store[key] = value;
+
+                            // Return OK
+                            response = "+OK\r\n";
+                        }
+                        else
+                        {
+                            response = "-ERR wrong number of arguments for 'set' command\r\n";
+                        }
+
+                        break;
+
+                    // Parse GET key
+                    case "GET":
+                        if (parts.Length >= 2)
+                        {
+                            string key = parts[1];
+
+                            if (_store.TryGetValue(key, out string? val))
+                            {
+                                // Return response (RESP bulk string format)
+                                response = $"${Encoding.UTF8.GetByteCount(val)}\r\n{val}\r\n";
+                            }
+                            else
+                            {
+                                // Key not found (null bulk string)
+                                response = "$-1\r\n";
+                            }
+                        }
+                        else
+                        {
+                            response = "-ERR wrong number of arguments for 'get' command\r\n";
+                        }
+
+                        break;
+
+                    case "PING":
+                        response = "+PONG\r\n";
+                        break;
+
+                    default:
+                        response = $"-ERR unknown command '{command}'\r\n";
+                        break;
+                }
+
+                // Send response back
+                byte[] responseBytes = Encoding.UTF8.GetBytes(response);
+                stream.Write(responseBytes, 0, responseBytes.Length);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle unexpected client disconnects or socket errors
+            Log($"Client error/disconnect [{clientEndPoint}]: {ex.Message}");
+        }
+        finally
+        {
+            client.Close();
+        }
+    }
+
+    private static void Log(string message)
+    {
+        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}");
+    }
 }
