@@ -3,6 +3,15 @@ using System.Collections.Concurrent;
 
 namespace RAPID.Storage;
 
+public enum NumericResultType
+{
+    Success,
+    NotAnInteger,
+    Overflow
+}
+
+public record NumericResult(NumericResultType Type, long NewValue);
+
 public class Database
 {
     private readonly ConcurrentDictionary<string, RedisValue> _store = new();
@@ -78,6 +87,53 @@ public class Database
         TimeSpan remaining = redisVal.ExpiresAtUtc.Value - DateTime.UtcNow;
         long seconds = (long)Math.Ceiling(remaining.TotalSeconds);
         return seconds > 0 ? seconds : -2;
+    }
+
+    public NumericResult IncrBy(string key, long amount)
+    {
+        while (true)
+        {
+            if (_store.TryGetValue(key, out var oldVal))
+            {
+                if (oldVal.IsExpired)
+                {
+                    _store.TryRemove(key, out _);
+                    var newVal = new RedisValue(amount.ToString(), null);
+                    if (_store.TryAdd(key, newVal))
+                    {
+                        return new NumericResult(NumericResultType.Success, amount);
+                    }
+                    continue;
+                }
+
+                if (!long.TryParse(oldVal.Value, out long current))
+                {
+                    return new NumericResult(NumericResultType.NotAnInteger, 0);
+                }
+
+                try
+                {
+                    long newValue = checked(current + amount);
+                    var newVal = new RedisValue(newValue.ToString(), oldVal.ExpiresAtUtc);
+                    if (_store.TryUpdate(key, newVal, oldVal))
+                    {
+                        return new NumericResult(NumericResultType.Success, newValue);
+                    }
+                }
+                catch (OverflowException)
+                {
+                    return new NumericResult(NumericResultType.Overflow, 0);
+                }
+            }
+            else
+            {
+                var newVal = new RedisValue(amount.ToString(), null);
+                if (_store.TryAdd(key, newVal))
+                {
+                    return new NumericResult(NumericResultType.Success, amount);
+                }
+            }
+        }
     }
 
     public int CleanupExpiredKeys()

@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using RAPID.Commands;
 using RAPID.Storage;
 
 class Program
@@ -101,6 +102,22 @@ class Program
                         {
                             response = "-ERR wrong number of arguments for 'get' command\r\n";
                         }
+                        break;
+
+                    case "INCR":
+                        response = IncrCommand.Execute(_db, parts);
+                        break;
+
+                    case "DECR":
+                        response = DecrCommand.Execute(_db, parts);
+                        break;
+
+                    case "INCRBY":
+                        response = IncrByCommand.Execute(_db, parts);
+                        break;
+
+                    case "DECRBY":
+                        response = DecrByCommand.Execute(_db, parts);
                         break;
 
                     case "EXPIRE":
