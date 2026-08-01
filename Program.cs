@@ -1,20 +1,23 @@
-﻿using System;
-using System.Collections.Concurrent;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using RAPID.Storage;
 
 class Program
 {
-    private static readonly ConcurrentDictionary<string, string> _store =
-        new ConcurrentDictionary<string, string>();
+    private static readonly Database _db = new Database();
 
     static async Task Main(string[] args)
     {
         int port = 6379;
         TcpListener listener = new TcpListener(IPAddress.Any, port);
         listener.Start();
+
+        // Start background key expiration manager (runs every 1 second)
+        var expirationManager = new ExpirationManager(_db, TimeSpan.FromSeconds(1));
+        expirationManager.Start();
 
         Log($"Redis Server started and listening on port {port}...");
 
@@ -71,7 +74,7 @@ class Program
                         {
                             string key = parts[1];
                             string value = string.Join(" ", parts, 2, parts.Length - 2);
-                            _store[key] = value;
+                            _db.Set(key, value);
                             response = "+OK\r\n";
                         }
                         else
@@ -84,7 +87,8 @@ class Program
                         if (parts.Length >= 2)
                         {
                             string key = parts[1];
-                            if (_store.TryGetValue(key, out string? val))
+                            string? val = _db.Get(key);
+                            if (val != null)
                             {
                                 response = $"${Encoding.UTF8.GetByteCount(val)}\r\n{val}\r\n";
                             }
@@ -99,19 +103,43 @@ class Program
                         }
                         break;
 
+                    case "EXPIRE":
+                        if (parts.Length >= 3 && int.TryParse(parts[2], out int seconds))
+                        {
+                            string key = parts[1];
+                            int result = _db.Expire(key, seconds);
+                            response = $":{result}\r\n";
+                        }
+                        else
+                        {
+                            response = "-ERR wrong number of arguments or invalid seconds for 'expire' command\r\n";
+                        }
+                        break;
+
+                    case "TTL":
+                        if (parts.Length >= 2)
+                        {
+                            string key = parts[1];
+                            long ttl = _db.Ttl(key);
+                            response = $":{ttl}\r\n";
+                        }
+                        else
+                        {
+                            response = "-ERR wrong number of arguments for 'ttl' command\r\n";
+                        }
+                        break;
+
                     case "DEL":
                         if (parts.Length >= 2)
                         {
                             int deletedCount = 0;
-
                             for (int i = 1; i < parts.Length; i++)
                             {
-                                if (_store.TryRemove(parts[i], out _))
+                                if (_db.Del(parts[i]))
                                 {
                                     deletedCount++;
                                 }
                             }
-
                             response = $":{deletedCount}\r\n";
                         }
                         else
@@ -124,15 +152,13 @@ class Program
                         if (parts.Length >= 2)
                         {
                             int existingCount = 0;
-
                             for (int i = 1; i < parts.Length; i++)
                             {
-                                if (_store.ContainsKey(parts[i]))
+                                if (_db.Exists(parts[i]))
                                 {
                                     existingCount++;
                                 }
                             }
-
                             response = $":{existingCount}\r\n";
                         }
                         else
