@@ -23,8 +23,16 @@ public class RedisValue
         ExpiresAtUtc = expiresAtUtc;
     }
 
+    public RedisValue(Dictionary<string, string> hashValue, DateTime? expiresAtUtc = null)
+    {
+        Type = RedisDataType.Hash;
+        Data = hashValue;
+        ExpiresAtUtc = expiresAtUtc;
+    }
+
     public string StringData => (string)Data;
     public LinkedList<string> ListData => (LinkedList<string>)Data;
+    public Dictionary<string, string> HashData => (Dictionary<string, string>)Data;
 
     public bool IsExpired => ExpiresAtUtc.HasValue && DateTime.UtcNow >= ExpiresAtUtc.Value;
 }

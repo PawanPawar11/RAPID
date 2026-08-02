@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using RAPID.Commands.HashCommands;
 using RAPID.Commands.KeyCommands;
 using RAPID.Commands.ListCommands;
 using RAPID.Commands.ServerCommands;
@@ -26,6 +27,12 @@ public class CommandDispatcher
         RegisterCommand(new LPopCommand());
         RegisterCommand(new RPopCommand());
         RegisterCommand(new LLenCommand());
+
+        RegisterCommand(new HSetCommand());
+        RegisterCommand(new HGetCommand());
+        RegisterCommand(new HDelCommand());
+        RegisterCommand(new HExistsCommand());
+        RegisterCommand(new HGetAllCommand());
 
         RegisterCommand(new DelCommand());
         RegisterCommand(new ExistsCommand());

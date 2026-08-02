@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace RAPID.Storage.Models;
 
 public enum GetResultType
@@ -27,3 +29,17 @@ public enum ListResultType
 }
 
 public record ListResult(ListResultType Type, long Length = 0, string? PopValue = null);
+
+public enum HashResultType
+{
+    Success,
+    WrongType,
+    KeyNotFound,
+    FieldNotFound
+}
+
+public record HashResult(
+    HashResultType Type,
+    long IntegerReply = 0,
+    string? Value = null,
+    Dictionary<string, string>? Entries = null);
