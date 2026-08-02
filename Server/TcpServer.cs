@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using RAPID.Commands;
+using RAPID.PubSub;
 using RAPID.Storage;
 
 namespace RAPID.Server;
@@ -13,16 +14,18 @@ public class TcpServer
 {
     private readonly int _port;
     private readonly Database _db;
+    private readonly PubSubManager _pubSub;
     private readonly CommandDispatcher _dispatcher;
     private readonly ClientHandler _clientHandler;
     private readonly ConcurrentDictionary<TcpClient, byte> _activeClients = new();
 
-    public TcpServer(int port, Database db, CommandDispatcher dispatcher)
+    public TcpServer(int port, Database db, PubSubManager pubSub, CommandDispatcher dispatcher)
     {
         _port = port;
         _db = db;
+        _pubSub = pubSub;
         _dispatcher = dispatcher;
-        _clientHandler = new ClientHandler(_db, _dispatcher);
+        _clientHandler = new ClientHandler(_db, _pubSub, _dispatcher);
     }
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -32,7 +35,6 @@ public class TcpServer
 
         Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Redis Server started and listening on port {_port}...");
 
-        // Register cancellation token registration to stop listener immediately
         using var reg = cancellationToken.Register(() =>
         {
             try

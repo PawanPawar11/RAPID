@@ -1,4 +1,3 @@
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.StringCommands;
@@ -7,7 +6,7 @@ public class IncrByCommand : ICommand
 {
     public string Name => "INCRBY";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 3)
         {
@@ -20,7 +19,7 @@ public class IncrByCommand : ICommand
             return "-ERR value is not an integer or out of range\r\n";
         }
 
-        var result = db.IncrBy(key, increment);
+        var result = context.Db.IncrBy(key, increment);
 
         return result.Type switch
         {

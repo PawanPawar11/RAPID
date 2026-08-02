@@ -1,5 +1,4 @@
 using System.Linq;
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.ListCommands;
@@ -8,7 +7,7 @@ public class LPushCommand : ICommand
 {
     public string Name => "LPUSH";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length < 3)
         {
@@ -17,7 +16,7 @@ public class LPushCommand : ICommand
 
         string key = parts[1];
         var values = parts.Skip(2);
-        var result = db.LPush(key, values);
+        var result = context.Db.LPush(key, values);
 
         return result.Type switch
         {

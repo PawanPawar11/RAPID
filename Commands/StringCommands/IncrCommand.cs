@@ -1,4 +1,3 @@
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.StringCommands;
@@ -7,7 +6,7 @@ public class IncrCommand : ICommand
 {
     public string Name => "INCR";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 2)
         {
@@ -15,7 +14,7 @@ public class IncrCommand : ICommand
         }
 
         string key = parts[1];
-        var result = db.IncrBy(key, 1);
+        var result = context.Db.IncrBy(key, 1);
 
         return result.Type switch
         {

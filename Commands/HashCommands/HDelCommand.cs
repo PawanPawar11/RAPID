@@ -1,4 +1,3 @@
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.HashCommands;
@@ -7,7 +6,7 @@ public class HDelCommand : ICommand
 {
     public string Name => "HDEL";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 3)
         {
@@ -17,7 +16,7 @@ public class HDelCommand : ICommand
         string key = parts[1];
         string field = parts[2];
 
-        var result = db.HDel(key, field);
+        var result = context.Db.HDel(key, field);
 
         return result.Type switch
         {

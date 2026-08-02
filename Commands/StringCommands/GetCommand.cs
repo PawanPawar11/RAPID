@@ -1,5 +1,4 @@
 using System.Text;
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.StringCommands;
@@ -8,7 +7,7 @@ public class GetCommand : ICommand
 {
     public string Name => "GET";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 2)
         {
@@ -16,7 +15,7 @@ public class GetCommand : ICommand
         }
 
         string key = parts[1];
-        var result = db.Get(key);
+        var result = context.Db.Get(key);
 
         return result.Type switch
         {

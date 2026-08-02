@@ -1,12 +1,10 @@
-using RAPID.Storage;
-
 namespace RAPID.Commands.StringCommands;
 
 public class SetCommand : ICommand
 {
     public string Name => "SET";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length < 3)
         {
@@ -15,7 +13,7 @@ public class SetCommand : ICommand
 
         string key = parts[1];
         string value = string.Join(" ", parts, 2, parts.Length - 2);
-        db.Set(key, value);
+        context.Db.Set(key, value);
 
         return "+OK\r\n";
     }

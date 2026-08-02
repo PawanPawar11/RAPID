@@ -3,10 +3,10 @@ using System.Collections.Concurrent;
 using RAPID.Commands.HashCommands;
 using RAPID.Commands.KeyCommands;
 using RAPID.Commands.ListCommands;
+using RAPID.Commands.PubSubCommands;
 using RAPID.Commands.ServerCommands;
 using RAPID.Commands.StringCommands;
 using RAPID.Persistence;
-using RAPID.Storage;
 
 namespace RAPID.Commands;
 
@@ -35,6 +35,10 @@ public class CommandDispatcher
         RegisterCommand(new HExistsCommand());
         RegisterCommand(new HGetAllCommand());
 
+        RegisterCommand(new SubscribeCommand());
+        RegisterCommand(new UnsubscribeCommand());
+        RegisterCommand(new PublishCommand());
+
         RegisterCommand(new DelCommand());
         RegisterCommand(new ExistsCommand());
         RegisterCommand(new ExpireCommand());
@@ -50,7 +54,7 @@ public class CommandDispatcher
         _commands[command.Name] = command;
     }
 
-    public string Dispatch(Database db, string rawInput)
+    public string Dispatch(CommandContext context, string rawInput)
     {
         if (string.IsNullOrWhiteSpace(rawInput))
             return string.Empty;
@@ -63,7 +67,7 @@ public class CommandDispatcher
 
         if (_commands.TryGetValue(commandName, out var command))
         {
-            return command.Execute(db, parts);
+            return command.Execute(context, parts);
         }
 
         return $"-ERR unknown command '{commandName}'\r\n";

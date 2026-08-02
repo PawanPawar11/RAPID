@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RAPID.Commands;
 using RAPID.Persistence;
+using RAPID.PubSub;
 using RAPID.Server;
 using RAPID.Storage;
 
@@ -13,6 +14,7 @@ class Program
         using var cts = new CancellationTokenSource();
 
         var db = new Database();
+        var pubSub = new PubSubManager();
         var persistenceManager = new PersistenceManager("dump.json");
 
         // Load existing database snapshot from disk on startup
@@ -28,7 +30,7 @@ class Program
         var expirationManager = new ExpirationManager(db, TimeSpan.FromSeconds(1));
         expirationManager.Start(cts.Token);
 
-        var server = new TcpServer(6379, db, dispatcher);
+        var server = new TcpServer(6379, db, pubSub, dispatcher);
 
         // Handle Ctrl+C and SIGINT/SIGTERM process signals for graceful shutdown
         Console.CancelKeyPress += (sender, eventArgs) =>

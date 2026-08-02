@@ -1,5 +1,4 @@
 using System.Text;
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.ListCommands;
@@ -8,7 +7,7 @@ public class RPopCommand : ICommand
 {
     public string Name => "RPOP";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 2)
         {
@@ -16,7 +15,7 @@ public class RPopCommand : ICommand
         }
 
         string key = parts[1];
-        var result = db.RPop(key);
+        var result = context.Db.RPop(key);
 
         return result.Type switch
         {

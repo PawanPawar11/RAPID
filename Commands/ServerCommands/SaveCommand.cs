@@ -1,6 +1,5 @@
 using System;
 using RAPID.Persistence;
-using RAPID.Storage;
 
 namespace RAPID.Commands.ServerCommands;
 
@@ -15,11 +14,11 @@ public class SaveCommand : ICommand
 
     public string Name => "SAVE";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         try
         {
-            _persistenceManager.Save(db);
+            _persistenceManager.Save(context.Db);
             return "+OK\r\n";
         }
         catch (Exception ex)

@@ -1,5 +1,4 @@
 using RAPID.Persistence;
-using RAPID.Storage;
 
 namespace RAPID.Commands.ServerCommands;
 
@@ -14,9 +13,9 @@ public class BgSaveCommand : ICommand
 
     public string Name => "BGSAVE";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
-        if (_persistenceManager.SaveBackground(db))
+        if (_persistenceManager.SaveBackground(context.Db))
         {
             return "+Background saving started\r\n";
         }

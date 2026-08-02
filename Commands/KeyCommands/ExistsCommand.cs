@@ -1,12 +1,10 @@
-using RAPID.Storage;
-
 namespace RAPID.Commands.KeyCommands;
 
 public class ExistsCommand : ICommand
 {
     public string Name => "EXISTS";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length < 2)
         {
@@ -16,7 +14,7 @@ public class ExistsCommand : ICommand
         int existingCount = 0;
         for (int i = 1; i < parts.Length; i++)
         {
-            if (db.Exists(parts[i]))
+            if (context.Db.Exists(parts[i]))
             {
                 existingCount++;
             }

@@ -1,4 +1,3 @@
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.HashCommands;
@@ -7,7 +6,7 @@ public class HSetCommand : ICommand
 {
     public string Name => "HSET";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length < 4)
         {
@@ -18,7 +17,7 @@ public class HSetCommand : ICommand
         string field = parts[2];
         string value = string.Join(" ", parts, 3, parts.Length - 3);
 
-        var result = db.HSet(key, field, value);
+        var result = context.Db.HSet(key, field, value);
 
         return result.Type switch
         {

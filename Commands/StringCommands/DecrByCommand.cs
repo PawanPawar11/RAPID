@@ -1,5 +1,4 @@
 using System;
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.StringCommands;
@@ -8,7 +7,7 @@ public class DecrByCommand : ICommand
 {
     public string Name => "DECRBY";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 3)
         {
@@ -24,7 +23,7 @@ public class DecrByCommand : ICommand
         try
         {
             long amount = checked(-decrement);
-            var result = db.IncrBy(key, amount);
+            var result = context.Db.IncrBy(key, amount);
 
             return result.Type switch
             {

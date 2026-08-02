@@ -1,4 +1,3 @@
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.ListCommands;
@@ -7,7 +6,7 @@ public class LLenCommand : ICommand
 {
     public string Name => "LLEN";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 2)
         {
@@ -15,7 +14,7 @@ public class LLenCommand : ICommand
         }
 
         string key = parts[1];
-        var result = db.LLen(key);
+        var result = context.Db.LLen(key);
 
         return result.Type switch
         {

@@ -2,6 +2,7 @@ using System;
 using System.Net.Sockets;
 using System.Text;
 using RAPID.Commands;
+using RAPID.PubSub;
 using RAPID.Storage;
 
 namespace RAPID.Server;
@@ -9,11 +10,13 @@ namespace RAPID.Server;
 public class ClientHandler
 {
     private readonly Database _db;
+    private readonly PubSubManager _pubSub;
     private readonly CommandDispatcher _dispatcher;
 
-    public ClientHandler(Database db, CommandDispatcher dispatcher)
+    public ClientHandler(Database db, PubSubManager pubSub, CommandDispatcher dispatcher)
     {
         _db = db;
+        _pubSub = pubSub;
         _dispatcher = dispatcher;
     }
 
@@ -23,6 +26,7 @@ public class ClientHandler
         Log($"Client connected: {clientEndPoint}");
 
         using NetworkStream stream = client.GetStream();
+        var session = new ClientSession(clientEndPoint, stream);
         byte[] buffer = new byte[1024];
 
         try
@@ -43,12 +47,12 @@ public class ClientHandler
                 if (string.IsNullOrWhiteSpace(input))
                     continue;
 
-                string response = _dispatcher.Dispatch(_db, input);
+                var context = new CommandContext(_db, _pubSub, session);
+                string response = _dispatcher.Dispatch(context, input);
 
                 if (!string.IsNullOrEmpty(response))
                 {
-                    byte[] responseBytes = Encoding.UTF8.GetBytes(response);
-                    stream.Write(responseBytes, 0, responseBytes.Length);
+                    session.SendRawResponse(response);
                 }
             }
         }
@@ -58,6 +62,8 @@ public class ClientHandler
         }
         finally
         {
+            // Automatic Pub/Sub cleanup when client disconnects
+            _pubSub.UnsubscribeAll(session);
             client.Close();
         }
     }

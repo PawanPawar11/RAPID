@@ -1,12 +1,10 @@
-using RAPID.Storage;
-
 namespace RAPID.Commands.KeyCommands;
 
 public class TtlCommand : ICommand
 {
     public string Name => "TTL";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 2)
         {
@@ -14,7 +12,7 @@ public class TtlCommand : ICommand
         }
 
         string key = parts[1];
-        long ttl = db.Ttl(key);
+        long ttl = context.Db.Ttl(key);
         return $":{ttl}\r\n";
     }
 }

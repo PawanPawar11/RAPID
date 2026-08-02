@@ -1,5 +1,4 @@
 using System.Text;
-using RAPID.Storage;
 using RAPID.Storage.Models;
 
 namespace RAPID.Commands.HashCommands;
@@ -8,7 +7,7 @@ public class HGetCommand : ICommand
 {
     public string Name => "HGET";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length != 3)
         {
@@ -18,7 +17,7 @@ public class HGetCommand : ICommand
         string key = parts[1];
         string field = parts[2];
 
-        var result = db.HGet(key, field);
+        var result = context.Db.HGet(key, field);
 
         return result.Type switch
         {

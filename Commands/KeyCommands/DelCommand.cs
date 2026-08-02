@@ -1,12 +1,10 @@
-using RAPID.Storage;
-
 namespace RAPID.Commands.KeyCommands;
 
 public class DelCommand : ICommand
 {
     public string Name => "DEL";
 
-    public string Execute(Database db, string[] parts)
+    public string Execute(CommandContext context, string[] parts)
     {
         if (parts.Length < 2)
         {
@@ -16,7 +14,7 @@ public class DelCommand : ICommand
         int deletedCount = 0;
         for (int i = 1; i < parts.Length; i++)
         {
-            if (db.Del(parts[i]))
+            if (context.Db.Del(parts[i]))
             {
                 deletedCount++;
             }
