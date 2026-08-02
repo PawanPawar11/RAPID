@@ -1,6 +1,6 @@
-# RAPID - High-Performance C# Redis Clone
+# RAPID - High-Performance Redis-Compatible In-Memory Data Store
 
-**RAPID** is a lightweight, high-performance, multithreaded Redis clone built from scratch in C# (.NET 10). It implements the Redis Serialization Protocol (RESP), supports multiple data types (Strings, Lists, Hashes), features hybrid key expiration (TTL), atomic lock-free numeric operations, JSON snapshot persistence, real-time Pub/Sub message broadcasting, and graceful server shutdown.
+**RAPID** is a lightweight, high-performance, multithreaded in-memory data store built from scratch in C# (.NET 10). It implements the Redis Serialization Protocol (RESP), supports multiple data types (Strings, Lists, Hashes), features hybrid key expiration (TTL), atomic lock-free numeric operations, JSON snapshot persistence, real-time Pub/Sub message broadcasting, and graceful server shutdown.
 
 ---
 
