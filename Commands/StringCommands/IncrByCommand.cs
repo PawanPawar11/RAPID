@@ -1,10 +1,13 @@
 using RAPID.Storage;
+using RAPID.Storage.Models;
 
-namespace RAPID.Commands;
+namespace RAPID.Commands.StringCommands;
 
-public static class IncrByCommand
+public class IncrByCommand : ICommand
 {
-    public static string Execute(Database db, string[] parts)
+    public string Name => "INCRBY";
+
+    public string Execute(Database db, string[] parts)
     {
         if (parts.Length != 3)
         {
@@ -24,6 +27,7 @@ public static class IncrByCommand
             NumericResultType.Success => $":{result.NewValue}\r\n",
             NumericResultType.NotAnInteger => "-ERR value is not an integer or out of range\r\n",
             NumericResultType.Overflow => "-ERR increment or decrement would overflow\r\n",
+            NumericResultType.WrongType => "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n",
             _ => "-ERR unknown error\r\n"
         };
     }

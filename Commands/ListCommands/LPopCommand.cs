@@ -1,19 +1,22 @@
 using System.Text;
 using RAPID.Storage;
+using RAPID.Storage.Models;
 
-namespace RAPID.Commands;
+namespace RAPID.Commands.ListCommands;
 
-public static class RPopCommand
+public class LPopCommand : ICommand
 {
-    public static string Execute(Database db, string[] parts)
+    public string Name => "LPOP";
+
+    public string Execute(Database db, string[] parts)
     {
         if (parts.Length != 2)
         {
-            return "-ERR wrong number of arguments for 'rpop' command\r\n";
+            return "-ERR wrong number of arguments for 'lpop' command\r\n";
         }
 
         string key = parts[1];
-        var result = db.RPop(key);
+        var result = db.LPop(key);
 
         return result.Type switch
         {

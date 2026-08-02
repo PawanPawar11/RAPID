@@ -1,4 +1,4 @@
-namespace RAPID.Storage;
+namespace RAPID.Storage.Models;
 
 public enum RedisDataType
 {

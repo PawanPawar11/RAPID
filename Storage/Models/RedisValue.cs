@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace RAPID.Storage;
+namespace RAPID.Storage.Models;
 
 public class RedisValue
 {
