@@ -1,16 +1,36 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace RAPID.Storage;
+
+public enum GetResultType
+{
+    Success,
+    NotFound,
+    WrongType
+}
+
+public record GetResult(GetResultType Type, string? Value);
 
 public enum NumericResultType
 {
     Success,
     NotAnInteger,
-    Overflow
+    Overflow,
+    WrongType
 }
 
 public record NumericResult(NumericResultType Type, long NewValue);
+
+public enum ListResultType
+{
+    Success,
+    WrongType,
+    KeyNotFound
+}
+
+public record ListResult(ListResultType Type, long Length = 0, string? PopValue = null);
 
 public class Database
 {
@@ -37,9 +57,17 @@ public class Database
         _store[key] = new RedisValue(value, expiresAtUtc: null);
     }
 
-    public string? Get(string key)
+    public GetResult Get(string key)
     {
-        return TryGetValidKey(key, out var redisVal) ? redisVal!.Value : null;
+        if (TryGetValidKey(key, out var redisVal))
+        {
+            if (redisVal!.Type != RedisDataType.String)
+            {
+                return new GetResult(GetResultType.WrongType, null);
+            }
+            return new GetResult(GetResultType.Success, redisVal.StringData);
+        }
+        return new GetResult(GetResultType.NotFound, null);
     }
 
     public bool Exists(string key)
@@ -106,7 +134,12 @@ public class Database
                     continue;
                 }
 
-                if (!long.TryParse(oldVal.Value, out long current))
+                if (oldVal.Type != RedisDataType.String)
+                {
+                    return new NumericResult(NumericResultType.WrongType, 0);
+                }
+
+                if (!long.TryParse(oldVal.StringData, out long current))
                 {
                     return new NumericResult(NumericResultType.NotAnInteger, 0);
                 }
@@ -134,6 +167,190 @@ public class Database
                 }
             }
         }
+    }
+
+    public ListResult LPush(string key, IEnumerable<string> values)
+    {
+        while (true)
+        {
+            if (_store.TryGetValue(key, out var oldVal))
+            {
+                if (oldVal.IsExpired)
+                {
+                    _store.TryRemove(key, out _);
+                    continue;
+                }
+
+                if (oldVal.Type != RedisDataType.List)
+                {
+                    return new ListResult(ListResultType.WrongType);
+                }
+
+                lock (oldVal.ListData)
+                {
+                    foreach (var val in values)
+                    {
+                        oldVal.ListData.AddFirst(val);
+                    }
+                    return new ListResult(ListResultType.Success, oldVal.ListData.Count);
+                }
+            }
+            else
+            {
+                var newList = new LinkedList<string>();
+                foreach (var val in values)
+                {
+                    newList.AddFirst(val);
+                }
+                var newVal = new RedisValue(newList, expiresAtUtc: null);
+                if (_store.TryAdd(key, newVal))
+                {
+                    return new ListResult(ListResultType.Success, newList.Count);
+                }
+            }
+        }
+    }
+
+    public ListResult RPush(string key, IEnumerable<string> values)
+    {
+        while (true)
+        {
+            if (_store.TryGetValue(key, out var oldVal))
+            {
+                if (oldVal.IsExpired)
+                {
+                    _store.TryRemove(key, out _);
+                    continue;
+                }
+
+                if (oldVal.Type != RedisDataType.List)
+                {
+                    return new ListResult(ListResultType.WrongType);
+                }
+
+                lock (oldVal.ListData)
+                {
+                    foreach (var val in values)
+                    {
+                        oldVal.ListData.AddLast(val);
+                    }
+                    return new ListResult(ListResultType.Success, oldVal.ListData.Count);
+                }
+            }
+            else
+            {
+                var newList = new LinkedList<string>();
+                foreach (var val in values)
+                {
+                    newList.AddLast(val);
+                }
+                var newVal = new RedisValue(newList, expiresAtUtc: null);
+                if (_store.TryAdd(key, newVal))
+                {
+                    return new ListResult(ListResultType.Success, newList.Count);
+                }
+            }
+        }
+    }
+
+    public ListResult LPop(string key)
+    {
+        if (_store.TryGetValue(key, out var oldVal))
+        {
+            if (oldVal.IsExpired)
+            {
+                _store.TryRemove(key, out _);
+                return new ListResult(ListResultType.KeyNotFound);
+            }
+
+            if (oldVal.Type != RedisDataType.List)
+            {
+                return new ListResult(ListResultType.WrongType);
+            }
+
+            lock (oldVal.ListData)
+            {
+                if (oldVal.ListData.Count == 0)
+                {
+                    _store.TryRemove(key, out _);
+                    return new ListResult(ListResultType.KeyNotFound);
+                }
+
+                string popped = oldVal.ListData.First!.Value;
+                oldVal.ListData.RemoveFirst();
+
+                if (oldVal.ListData.Count == 0)
+                {
+                    _store.TryRemove(key, out _);
+                }
+
+                return new ListResult(ListResultType.Success, PopValue: popped);
+            }
+        }
+
+        return new ListResult(ListResultType.KeyNotFound);
+    }
+
+    public ListResult RPop(string key)
+    {
+        if (_store.TryGetValue(key, out var oldVal))
+        {
+            if (oldVal.IsExpired)
+            {
+                _store.TryRemove(key, out _);
+                return new ListResult(ListResultType.KeyNotFound);
+            }
+
+            if (oldVal.Type != RedisDataType.List)
+            {
+                return new ListResult(ListResultType.WrongType);
+            }
+
+            lock (oldVal.ListData)
+            {
+                if (oldVal.ListData.Count == 0)
+                {
+                    _store.TryRemove(key, out _);
+                    return new ListResult(ListResultType.KeyNotFound);
+                }
+
+                string popped = oldVal.ListData.Last!.Value;
+                oldVal.ListData.RemoveLast();
+
+                if (oldVal.ListData.Count == 0)
+                {
+                    _store.TryRemove(key, out _);
+                }
+
+                return new ListResult(ListResultType.Success, PopValue: popped);
+            }
+        }
+
+        return new ListResult(ListResultType.KeyNotFound);
+    }
+
+    public ListResult LLen(string key)
+    {
+        if (_store.TryGetValue(key, out var oldVal))
+        {
+            if (oldVal.IsExpired)
+            {
+                _store.TryRemove(key, out _);
+                return new ListResult(ListResultType.Success, Length: 0);
+            }
+
+            if (oldVal.Type != RedisDataType.List)
+            {
+                return new ListResult(ListResultType.WrongType);
+            }
+
+            lock (oldVal.ListData)
+            {
+                return new ListResult(ListResultType.Success, Length: oldVal.ListData.Count);
+            }
+        }
+
+        return new ListResult(ListResultType.Success, Length: 0);
     }
 
     public int CleanupExpiredKeys()

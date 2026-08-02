@@ -88,15 +88,14 @@ class Program
                         if (parts.Length >= 2)
                         {
                             string key = parts[1];
-                            string? val = _db.Get(key);
-                            if (val != null)
+                            var getResult = _db.Get(key);
+                            response = getResult.Type switch
                             {
-                                response = $"${Encoding.UTF8.GetByteCount(val)}\r\n{val}\r\n";
-                            }
-                            else
-                            {
-                                response = "$-1\r\n";
-                            }
+                                GetResultType.Success => $"${Encoding.UTF8.GetByteCount(getResult.Value!)}\r\n{getResult.Value}\r\n",
+                                GetResultType.NotFound => "$-1\r\n",
+                                GetResultType.WrongType => "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n",
+                                _ => "-ERR unknown error\r\n"
+                            };
                         }
                         else
                         {
@@ -118,6 +117,26 @@ class Program
 
                     case "DECRBY":
                         response = DecrByCommand.Execute(_db, parts);
+                        break;
+
+                    case "LPUSH":
+                        response = LPushCommand.Execute(_db, parts);
+                        break;
+
+                    case "RPUSH":
+                        response = RPushCommand.Execute(_db, parts);
+                        break;
+
+                    case "LPOP":
+                        response = LPopCommand.Execute(_db, parts);
+                        break;
+
+                    case "RPOP":
+                        response = RPopCommand.Execute(_db, parts);
+                        break;
+
+                    case "LLEN":
+                        response = LLenCommand.Execute(_db, parts);
                         break;
 
                     case "EXPIRE":
