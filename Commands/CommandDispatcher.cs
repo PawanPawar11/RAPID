@@ -5,6 +5,7 @@ using RAPID.Commands.KeyCommands;
 using RAPID.Commands.ListCommands;
 using RAPID.Commands.ServerCommands;
 using RAPID.Commands.StringCommands;
+using RAPID.Persistence;
 using RAPID.Storage;
 
 namespace RAPID.Commands;
@@ -13,7 +14,7 @@ public class CommandDispatcher
 {
     private readonly ConcurrentDictionary<string, ICommand> _commands = new(StringComparer.OrdinalIgnoreCase);
 
-    public CommandDispatcher()
+    public CommandDispatcher(PersistenceManager persistenceManager)
     {
         RegisterCommand(new GetCommand());
         RegisterCommand(new SetCommand());
@@ -40,6 +41,8 @@ public class CommandDispatcher
         RegisterCommand(new TtlCommand());
 
         RegisterCommand(new PingCommand());
+        RegisterCommand(new SaveCommand(persistenceManager));
+        RegisterCommand(new BgSaveCommand(persistenceManager));
     }
 
     public void RegisterCommand(ICommand command)
